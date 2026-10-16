@@ -6,3 +6,22 @@
   3. Какие SFP модули вставленны
   4. Состояние блоков питания
   5. Состояние темпиратуры
+
+
+## Шаблоны
+
+| Версия Zabbix | Файл |
+|---|---|
+| 6.0 | `zabbix_6.0/template_eltex_mes2408c_snmp.yaml` |
+| 7.4 | `zabbix_7.4/template_eltex_mes2408c_snmp.yaml` |
+
+Импорт: *Data collection → Templates → Import* (в 6.0: *Configuration → Templates → Import*). Хост: SNMP-интерфейс (v2c) + шаблон `Eltex MES2408C SNMP`.
+
+Что мониторится:
+1. Пинг — `icmpping`, потери, время отклика + триггеры.
+2. Порты (LLD по IF-MIB) — oper/admin статус (up/down, connected/disconnected), скорость порта, входящий/исходящий трафик (бит/с), ошибки.
+3. SFP-модули (LLD по ENTITY-MIB) — модель, производитель, серийный номер.
+4. Блоки питания — основной и резервный (Radlan `rlPhdUnitEnvParam*`), триггеры по статусу.
+5. Температура — значение и статус датчика, пороги `{$TEMP_WARN}` / `{$TEMP_CRIT}`.
+
+Примечание: OID вендорных веток (БП, температура) и фильтр SFP (`{$SFP.DESCR.MATCHES}`) нужно сверить на реальном устройстве (`snmpwalk`) и прошивке.
