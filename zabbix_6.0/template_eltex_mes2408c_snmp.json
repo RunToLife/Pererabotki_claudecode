@@ -1,0 +1,752 @@
+{
+  "zabbix_export": {
+    "version": "6.0",
+    "groups": [
+      {
+        "uuid": "5f644b1f001f5973be8c8c9ef17ddf6b",
+        "name": "Templates/Network devices"
+      }
+    ],
+    "templates": [
+      {
+        "uuid": "b727ea53b0b051aaad1d292acbcb24c4",
+        "template": "Eltex MES2408C SNMP",
+        "name": "Eltex MES2408C SNMP",
+        "description": "Eltex MES2408C: ping, порты, SFP, БП, температура (SNMP v2c/v3). Требуется SNMP-интерфейс на хосте.",
+        "groups": [
+          {
+            "name": "Templates/Network devices"
+          }
+        ],
+        "items": [
+          {
+            "uuid": "70c2e03b3c22590cb929a49f8d6b8568",
+            "name": "ICMP ping",
+            "type": "SIMPLE",
+            "key": "icmpping",
+            "delay": "30s",
+            "valuemap": {
+              "name": "Service state"
+            },
+            "tags": [
+              {
+                "tag": "component",
+                "value": "network"
+              }
+            ],
+            "triggers": [
+              {
+                "uuid": "eb8eff9ed1225322be7010c621c577d9",
+                "expression": "max(/Eltex MES2408C SNMP/icmpping,#3)=0",
+                "name": "{HOST.NAME}: недоступен по ICMP ping",
+                "priority": "HIGH"
+              }
+            ]
+          },
+          {
+            "uuid": "b893e4cb08c455148167034e34176899",
+            "name": "ICMP потери пакетов",
+            "type": "SIMPLE",
+            "key": "icmppingloss",
+            "delay": "30s",
+            "value_type": "FLOAT",
+            "units": "%",
+            "triggers": [
+              {
+                "uuid": "19ee733532315ecd851c1fd0c71dd55e",
+                "expression": "min(/Eltex MES2408C SNMP/icmppingloss,5m)>{$ICMP.LOSS.WARN} and min(/Eltex MES2408C SNMP/icmppingloss,5m)<100",
+                "name": "{HOST.NAME}: потери ICMP > {$ICMP.LOSS.WARN}%",
+                "priority": "WARNING"
+              }
+            ]
+          },
+          {
+            "uuid": "a76e4d62157859bd8d33533f6c4a05f9",
+            "name": "ICMP время отклика",
+            "type": "SIMPLE",
+            "key": "icmppingsec",
+            "delay": "30s",
+            "value_type": "FLOAT",
+            "units": "s",
+            "triggers": [
+              {
+                "uuid": "556bbd7a23325e85ab8b4a322d9676b8",
+                "expression": "avg(/Eltex MES2408C SNMP/icmppingsec,5m)>{$ICMP.RESPONSE.WARN}",
+                "name": "{HOST.NAME}: высокое время отклика ICMP",
+                "priority": "WARNING"
+              }
+            ]
+          },
+          {
+            "uuid": "1acb8cfc01285517bb6d631e9412c96b",
+            "name": "SNMP: sysDescr",
+            "type": "SNMP_AGENT",
+            "snmp_oid": "1.3.6.1.2.1.1.1.0",
+            "key": "system.descr",
+            "delay": "1h",
+            "value_type": "CHAR",
+            "trends": "0"
+          },
+          {
+            "uuid": "3816c2630c865dd889cd4a4caf48a78e",
+            "name": "SNMP: sysUpTime",
+            "type": "SNMP_AGENT",
+            "snmp_oid": "1.3.6.1.2.1.1.3.0",
+            "key": "system.uptime",
+            "delay": "1m",
+            "units": "uptime",
+            "preprocessing": [
+              {
+                "type": "MULTIPLIER",
+                "parameters": [
+                  "0.01"
+                ]
+              }
+            ]
+          },
+          {
+            "uuid": "20c2e2e3bee154c9ac0bb50d42c4cfd2",
+            "name": "SNMP: доступность",
+            "type": "SNMP_AGENT",
+            "snmp_oid": "1.3.6.1.2.1.1.2.0",
+            "key": "snmp.availability",
+            "delay": "1m",
+            "value_type": "CHAR",
+            "trends": "0",
+            "triggers": [
+              {
+                "uuid": "ec40b8bba4055cb08e0520ecbcf0a807",
+                "expression": "nodata(/Eltex MES2408C SNMP/system.uptime,5m)=1",
+                "name": "{HOST.NAME}: нет данных по SNMP",
+                "priority": "AVERAGE",
+                "dependencies": [
+                  {
+                    "name": "{HOST.NAME}: недоступен по ICMP ping",
+                    "expression": "max(/Eltex MES2408C SNMP/icmpping,#3)=0"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "uuid": "4fc17230694c51549efa108bec9ef87b",
+            "name": "Блок питания: основной",
+            "type": "SNMP_AGENT",
+            "snmp_oid": "{$ELTEX.PS.MAIN.OID}",
+            "key": "eltex.ps.main",
+            "delay": "1m",
+            "valuemap": {
+              "name": "Eltex PS status"
+            },
+            "tags": [
+              {
+                "tag": "component",
+                "value": "power"
+              }
+            ],
+            "triggers": [
+              {
+                "uuid": "da3a23a3295354788e750675d031618e",
+                "expression": "last(/Eltex MES2408C SNMP/eltex.ps.main)>=2 and last(/Eltex MES2408C SNMP/eltex.ps.main)<>5 and last(/Eltex MES2408C SNMP/eltex.ps.main)<>8",
+                "name": "{HOST.NAME}: основной БП неисправен",
+                "priority": "HIGH"
+              }
+            ]
+          },
+          {
+            "uuid": "e490fac550c954eb981143bee69c796e",
+            "name": "Блок питания: резервный",
+            "type": "SNMP_AGENT",
+            "snmp_oid": "{$ELTEX.PS.RED.OID}",
+            "key": "eltex.ps.redundant",
+            "delay": "1m",
+            "valuemap": {
+              "name": "Eltex PS status"
+            },
+            "tags": [
+              {
+                "tag": "component",
+                "value": "power"
+              }
+            ],
+            "triggers": [
+              {
+                "uuid": "26a656b86eb454fdb3b4955c4020f82f",
+                "expression": "last(/Eltex MES2408C SNMP/eltex.ps.redundant)>=2 and last(/Eltex MES2408C SNMP/eltex.ps.redundant)<>5 and last(/Eltex MES2408C SNMP/eltex.ps.redundant)<>8",
+                "name": "{HOST.NAME}: резервный БП неисправен",
+                "priority": "WARNING"
+              }
+            ]
+          },
+          {
+            "uuid": "8725ff4df6305b6da68e616cd637dd36",
+            "name": "Температура",
+            "type": "SNMP_AGENT",
+            "snmp_oid": "{$ELTEX.TEMP.OID}",
+            "key": "eltex.temperature",
+            "delay": "1m",
+            "value_type": "FLOAT",
+            "units": "°C",
+            "tags": [
+              {
+                "tag": "component",
+                "value": "environment"
+              }
+            ],
+            "triggers": [
+              {
+                "uuid": "115c60d7d4595b8492c079ea3d47a043",
+                "expression": "avg(/Eltex MES2408C SNMP/eltex.temperature,5m)>{$TEMP.WARN}",
+                "name": "{HOST.NAME}: температура выше {$TEMP.WARN}°C",
+                "priority": "WARNING"
+              },
+              {
+                "uuid": "8b1a3bd9acdf5dae8465c24eb698e25c",
+                "expression": "avg(/Eltex MES2408C SNMP/eltex.temperature,5m)>{$TEMP.CRIT}",
+                "name": "{HOST.NAME}: критическая температура выше {$TEMP.CRIT}°C",
+                "priority": "HIGH"
+              }
+            ]
+          }
+        ],
+        "discovery_rules": [
+          {
+            "uuid": "027f360fce0b5dfa99e11fdf105bfbec",
+            "name": "Обнаружение портов",
+            "type": "SNMP_AGENT",
+            "key": "net.if.discovery",
+            "delay": "1h",
+            "snmp_oid": "discovery[{#IFNAME},1.3.6.1.2.1.31.1.1.1.1,{#IFALIAS},1.3.6.1.2.1.31.1.1.1.18]",
+            "filter": {
+              "evaltype": "AND_OR",
+              "conditions": [
+                {
+                  "macro": "{#IFNAME}",
+                  "value": "{$IF.NAME.MATCHES}",
+                  "formulaid": "A"
+                },
+                {
+                  "macro": "{#IFNAME}",
+                  "value": "{$IF.NAME.NOT_MATCHES}",
+                  "operator": "NOT_MATCHES_REGEX",
+                  "formulaid": "B"
+                }
+              ]
+            },
+            "item_prototypes": [
+              {
+                "uuid": "e32b33e5b7875e229bf0ea761f207319",
+                "name": "Port {#IFNAME}: состояние (oper)",
+                "type": "SNMP_AGENT",
+                "snmp_oid": "1.3.6.1.2.1.2.2.1.8.{#SNMPINDEX}",
+                "key": "net.if.oper[{#SNMPINDEX}]",
+                "delay": "1m",
+                "valuemap": {
+                  "name": "IF-MIB::ifOperStatus"
+                },
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "network"
+                  },
+                  {
+                    "tag": "interface",
+                    "value": "{#IFNAME}"
+                  }
+                ],
+                "trends": "365d",
+                "trigger_prototypes": [
+                  {
+                    "uuid": "9204c31b68415a06bef48283025f5b46",
+                    "expression": "last(/Eltex MES2408C SNMP/net.if.oper[{#SNMPINDEX}])=2 and last(/Eltex MES2408C SNMP/net.if.admin[{#SNMPINDEX}])=1",
+                    "name": "Port {#IFNAME}: link down",
+                    "priority": "WARNING",
+                    "manual_close": "YES"
+                  }
+                ]
+              },
+              {
+                "uuid": "dcf9c49ee49453a98eee556042c04483",
+                "name": "Port {#IFNAME}: админ. состояние",
+                "type": "SNMP_AGENT",
+                "snmp_oid": "1.3.6.1.2.1.2.2.1.7.{#SNMPINDEX}",
+                "key": "net.if.admin[{#SNMPINDEX}]",
+                "delay": "1m",
+                "valuemap": {
+                  "name": "IF-MIB::ifAdminStatus"
+                },
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "network"
+                  },
+                  {
+                    "tag": "interface",
+                    "value": "{#IFNAME}"
+                  }
+                ],
+                "trends": "365d",
+                "trigger_prototypes": []
+              },
+              {
+                "uuid": "665b988fb2ec5e818a9fdab3e7066d7d",
+                "name": "Port {#IFNAME}: линк (connected/disconnected)",
+                "type": "SNMP_AGENT",
+                "snmp_oid": "1.3.6.1.2.1.2.2.1.8.{#SNMPINDEX}",
+                "key": "net.if.link[{#SNMPINDEX}]",
+                "delay": "1m",
+                "valuemap": {
+                  "name": "Port link"
+                },
+                "preprocessing": [
+                  {
+                    "type": "JAVASCRIPT",
+                    "parameters": [
+                      "return value == 1 ? 1 : 0;"
+                    ]
+                  }
+                ],
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "network"
+                  },
+                  {
+                    "tag": "interface",
+                    "value": "{#IFNAME}"
+                  }
+                ],
+                "trends": "365d",
+                "trigger_prototypes": []
+              },
+              {
+                "uuid": "3fdb85f1df0c592391fe4ebb53a68307",
+                "name": "Port {#IFNAME}: полоса пропускания",
+                "type": "SNMP_AGENT",
+                "snmp_oid": "1.3.6.1.2.1.31.1.1.1.15.{#SNMPINDEX}",
+                "key": "net.if.speed[{#SNMPINDEX}]",
+                "delay": "1m",
+                "units": "bps",
+                "preprocessing": [
+                  {
+                    "type": "MULTIPLIER",
+                    "parameters": [
+                      "1000000"
+                    ]
+                  },
+                  {
+                    "type": "DISCARD_UNCHANGED_HEARTBEAT",
+                    "parameters": [
+                      "1d"
+                    ]
+                  }
+                ],
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "network"
+                  },
+                  {
+                    "tag": "interface",
+                    "value": "{#IFNAME}"
+                  }
+                ],
+                "trends": "365d",
+                "trigger_prototypes": []
+              },
+              {
+                "uuid": "8ac1b1602dd95ff2b348f3de1938a64f",
+                "name": "Port {#IFNAME}: входящий трафик",
+                "type": "SNMP_AGENT",
+                "snmp_oid": "1.3.6.1.2.1.31.1.1.1.6.{#SNMPINDEX}",
+                "key": "net.if.in[{#SNMPINDEX}]",
+                "delay": "1m",
+                "units": "bps",
+                "preprocessing": [
+                  {
+                    "type": "CHANGE_PER_SECOND"
+                  },
+                  {
+                    "type": "MULTIPLIER",
+                    "parameters": [
+                      "8"
+                    ]
+                  }
+                ],
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "network"
+                  },
+                  {
+                    "tag": "interface",
+                    "value": "{#IFNAME}"
+                  }
+                ],
+                "trends": "365d",
+                "trigger_prototypes": []
+              },
+              {
+                "uuid": "c7ca67a52eb051c2b2f54bb545d10f36",
+                "name": "Port {#IFNAME}: исходящий трафик",
+                "type": "SNMP_AGENT",
+                "snmp_oid": "1.3.6.1.2.1.31.1.1.1.10.{#SNMPINDEX}",
+                "key": "net.if.out[{#SNMPINDEX}]",
+                "delay": "1m",
+                "units": "bps",
+                "preprocessing": [
+                  {
+                    "type": "CHANGE_PER_SECOND"
+                  },
+                  {
+                    "type": "MULTIPLIER",
+                    "parameters": [
+                      "8"
+                    ]
+                  }
+                ],
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "network"
+                  },
+                  {
+                    "tag": "interface",
+                    "value": "{#IFNAME}"
+                  }
+                ],
+                "trends": "365d",
+                "trigger_prototypes": []
+              },
+              {
+                "uuid": "91eb1f1413405a078af60b4775466d88",
+                "name": "Port {#IFNAME}: ошибки входящие",
+                "type": "SNMP_AGENT",
+                "snmp_oid": "1.3.6.1.2.1.2.2.1.14.{#SNMPINDEX}",
+                "key": "net.if.in.errors[{#SNMPINDEX}]",
+                "delay": "1m",
+                "units": "pps",
+                "preprocessing": [
+                  {
+                    "type": "CHANGE_PER_SECOND"
+                  }
+                ],
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "network"
+                  },
+                  {
+                    "tag": "interface",
+                    "value": "{#IFNAME}"
+                  }
+                ],
+                "trends": "365d",
+                "trigger_prototypes": []
+              },
+              {
+                "uuid": "269943ee162056b5ad340a2e16fd3525",
+                "name": "Port {#IFNAME}: ошибки исходящие",
+                "type": "SNMP_AGENT",
+                "snmp_oid": "1.3.6.1.2.1.2.2.1.20.{#SNMPINDEX}",
+                "key": "net.if.out.errors[{#SNMPINDEX}]",
+                "delay": "1m",
+                "units": "pps",
+                "preprocessing": [
+                  {
+                    "type": "CHANGE_PER_SECOND"
+                  }
+                ],
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "network"
+                  },
+                  {
+                    "tag": "interface",
+                    "value": "{#IFNAME}"
+                  }
+                ],
+                "trends": "365d",
+                "trigger_prototypes": []
+              }
+            ]
+          },
+          {
+            "uuid": "1518c9ce42035817b8fd0012dcd27039",
+            "name": "Обнаружение SFP модулей",
+            "type": "SNMP_AGENT",
+            "key": "eltex.sfp.discovery",
+            "delay": "1h",
+            "snmp_oid": "discovery[{#SFPNAME},1.3.6.1.2.1.31.1.1.1.1,{#SFPVENDOR},{$ELTEX.SFP.VENDOR.OID}]",
+            "filter": {
+              "evaltype": "AND_OR",
+              "conditions": [
+                {
+                  "macro": "{#SFPVENDOR}",
+                  "value": ".+",
+                  "formulaid": "A"
+                }
+              ]
+            },
+            "description": "Находит порты, в которых установлен SFP (у которых есть vendor name). OID см. в README.",
+            "item_prototypes": [
+              {
+                "uuid": "55be0b6f615a5ae18809e2d3ef926c15",
+                "name": "SFP {#SFPNAME}: производитель",
+                "type": "SNMP_AGENT",
+                "snmp_oid": "{$ELTEX.SFP.VENDOR.OID}.{#SNMPINDEX}",
+                "key": "eltex.sfp.vendor[{#SNMPINDEX}]",
+                "delay": "1h",
+                "value_type": "CHAR",
+                "trends": "0",
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "sfp"
+                  },
+                  {
+                    "tag": "sfp",
+                    "value": "{#SFPNAME}"
+                  }
+                ]
+              },
+              {
+                "uuid": "2cb61ce5344a5b9ea4ad5b75a0cf780a",
+                "name": "SFP {#SFPNAME}: модель (part number)",
+                "type": "SNMP_AGENT",
+                "snmp_oid": "{$ELTEX.SFP.PART.OID}.{#SNMPINDEX}",
+                "key": "eltex.sfp.part[{#SNMPINDEX}]",
+                "delay": "1h",
+                "value_type": "CHAR",
+                "trends": "0",
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "sfp"
+                  },
+                  {
+                    "tag": "sfp",
+                    "value": "{#SFPNAME}"
+                  }
+                ]
+              },
+              {
+                "uuid": "aafa7c0134f55b508d8ced4e25218e5e",
+                "name": "SFP {#SFPNAME}: серийный номер",
+                "type": "SNMP_AGENT",
+                "snmp_oid": "{$ELTEX.SFP.SERIAL.OID}.{#SNMPINDEX}",
+                "key": "eltex.sfp.serial[{#SNMPINDEX}]",
+                "delay": "1h",
+                "value_type": "CHAR",
+                "trends": "0",
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "sfp"
+                  },
+                  {
+                    "tag": "sfp",
+                    "value": "{#SFPNAME}"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "macros": [
+          {
+            "macro": "{$ICMP.LOSS.WARN}",
+            "value": "20",
+            "description": "Порог потерь ICMP, %"
+          },
+          {
+            "macro": "{$ICMP.RESPONSE.WARN}",
+            "value": "0.15",
+            "description": "Порог времени отклика, c"
+          },
+          {
+            "macro": "{$TEMP.WARN}",
+            "value": "60",
+            "description": "Температура WARNING, °C"
+          },
+          {
+            "macro": "{$TEMP.CRIT}",
+            "value": "75",
+            "description": "Температура HIGH, °C"
+          },
+          {
+            "macro": "{$IF.NAME.MATCHES}",
+            "value": ".*",
+            "description": "Какие порты обнаруживать"
+          },
+          {
+            "macro": "{$IF.NAME.NOT_MATCHES}",
+            "value": "^(Vlan|vlan|Null|loopback|lo)",
+            "description": "Какие порты игнорировать"
+          },
+          {
+            "macro": "{$ELTEX.PS.MAIN.OID}",
+            "value": "1.3.6.1.4.1.89.53.15.1.2.1",
+            "description": "rlPhdUnitEnvParamMainPSStatus (RADLAN-HWENVIROMENT)"
+          },
+          {
+            "macro": "{$ELTEX.PS.RED.OID}",
+            "value": "1.3.6.1.4.1.89.53.15.1.3.1",
+            "description": "rlPhdUnitEnvParamRedundantPSStatus"
+          },
+          {
+            "macro": "{$ELTEX.TEMP.OID}",
+            "value": "1.3.6.1.4.1.89.53.15.1.10.1",
+            "description": "rlPhdUnitEnvParamTempSensorValue"
+          },
+          {
+            "macro": "{$ELTEX.SFP.VENDOR.OID}",
+            "value": "1.3.6.1.4.1.35265.1.23.53.1.1.1.5",
+            "description": "eltPhdTransceiverInfoVendorName - ПРОВЕРИТЬ snmpwalk-ом"
+          },
+          {
+            "macro": "{$ELTEX.SFP.PART.OID}",
+            "value": "1.3.6.1.4.1.35265.1.23.53.1.1.1.6",
+            "description": "eltPhdTransceiverInfoPartNumber - ПРОВЕРИТЬ"
+          },
+          {
+            "macro": "{$ELTEX.SFP.SERIAL.OID}",
+            "value": "1.3.6.1.4.1.35265.1.23.53.1.1.1.7",
+            "description": "eltPhdTransceiverInfoSerialNumber - ПРОВЕРИТЬ"
+          }
+        ],
+        "valuemaps": [
+          {
+            "uuid": "2c340658e2a358938f9eb71aea9a1104",
+            "name": "Service state",
+            "mappings": [
+              {
+                "value": "0",
+                "newvalue": "Down"
+              },
+              {
+                "value": "1",
+                "newvalue": "Up"
+              }
+            ]
+          },
+          {
+            "uuid": "a754380e01925884bf8246e65bdaaf3d",
+            "name": "Port link",
+            "mappings": [
+              {
+                "value": "0",
+                "newvalue": "Disconnected"
+              },
+              {
+                "value": "1",
+                "newvalue": "Connected"
+              }
+            ]
+          },
+          {
+            "uuid": "de309796c7a858c5918f256670a809a0",
+            "name": "IF-MIB::ifOperStatus",
+            "mappings": [
+              {
+                "value": "1",
+                "newvalue": "up"
+              },
+              {
+                "value": "2",
+                "newvalue": "down"
+              },
+              {
+                "value": "3",
+                "newvalue": "testing"
+              },
+              {
+                "value": "4",
+                "newvalue": "unknown"
+              },
+              {
+                "value": "5",
+                "newvalue": "dormant"
+              },
+              {
+                "value": "6",
+                "newvalue": "notPresent"
+              },
+              {
+                "value": "7",
+                "newvalue": "lowerLayerDown"
+              }
+            ]
+          },
+          {
+            "uuid": "1b8c3430d7945a57a9217804730a5871",
+            "name": "IF-MIB::ifAdminStatus",
+            "mappings": [
+              {
+                "value": "1",
+                "newvalue": "up"
+              },
+              {
+                "value": "2",
+                "newvalue": "down"
+              },
+              {
+                "value": "3",
+                "newvalue": "testing"
+              }
+            ]
+          },
+          {
+            "uuid": "acb5386e43eb56d692d7da05c40bc7c9",
+            "name": "Eltex PS status",
+            "mappings": [
+              {
+                "value": "1",
+                "newvalue": "normal"
+              },
+              {
+                "value": "2",
+                "newvalue": "warning"
+              },
+              {
+                "value": "3",
+                "newvalue": "critical"
+              },
+              {
+                "value": "4",
+                "newvalue": "shutdown"
+              },
+              {
+                "value": "5",
+                "newvalue": "notPresent"
+              },
+              {
+                "value": "6",
+                "newvalue": "notFunctioning"
+              },
+              {
+                "value": "7",
+                "newvalue": "restore"
+              },
+              {
+                "value": "8",
+                "newvalue": "notAvailable"
+              }
+            ]
+          }
+        ],
+        "tags": [
+          {
+            "tag": "vendor",
+            "value": "Eltex"
+          },
+          {
+            "tag": "model",
+            "value": "MES2408C"
+          }
+        ]
+      }
+    ]
+  }
+}
