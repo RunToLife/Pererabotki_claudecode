@@ -1,0 +1,505 @@
+zabbix_export:
+  version: '7.4'
+  template_groups:
+  - uuid: 8643321b70094fd983c4f03b214f02fc
+    name: Templates/Network devices
+  templates:
+  - uuid: ff2c59ef9809477488edc7fb61975cc4
+    template: Eltex MES2408C SNMP
+    name: Eltex MES2408C SNMP
+    description: 'Мониторинг Eltex MES2408C по SNMP + ICMP: ping, порты, SFP, блоки питания, температура. Хосту нужен SNMP-интерфейс.'
+    groups:
+    - name: Templates/Network devices
+    items:
+    - uuid: 9568a89561674f7e84e75819ac19fbf6
+      name: ICMP ping
+      type: SIMPLE
+      key: icmpping
+      delay: 30s
+      history: 7d
+      trends: 365d
+      valuemap:
+        name: Eltex ICMP ping
+      tags:
+      - tag: component
+        value: network
+    - uuid: b1e269d4303e44cb85d61679f559ece7
+      name: ICMP response time
+      type: SIMPLE
+      key: icmppingsec
+      delay: 30s
+      history: 7d
+      trends: 365d
+      units: s
+      value_type: FLOAT
+      tags:
+      - tag: component
+        value: network
+    - uuid: 33bceac26d02451f8ba66f1cad07cd50
+      name: ICMP loss
+      type: SIMPLE
+      key: icmppingloss
+      delay: 30s
+      history: 7d
+      trends: 365d
+      units: '%'
+      tags:
+      - tag: component
+        value: network
+    - uuid: d9d8ea38a4da4ce081ddce40e92909de
+      name: System description
+      type: SNMP_AGENT
+      snmp_oid: 1.3.6.1.2.1.1.1.0
+      key: system.descr
+      delay: 1h
+      history: 7d
+      trends: '0'
+      value_type: TEXT
+      preprocessing:
+      - type: DISCARD_UNCHANGED_HEARTBEAT
+        parameters:
+        - 1d
+      tags:
+      - tag: component
+        value: system
+    - uuid: 0186c8cb67504a3b86ee66b9e855ad22
+      name: System name
+      type: SNMP_AGENT
+      snmp_oid: 1.3.6.1.2.1.1.5.0
+      key: system.name
+      delay: 1h
+      history: 7d
+      trends: '0'
+      value_type: TEXT
+      preprocessing:
+      - type: DISCARD_UNCHANGED_HEARTBEAT
+        parameters:
+        - 1d
+      tags:
+      - tag: component
+        value: system
+    - uuid: 05ba2553715f456080725b1edf39c3f0
+      name: Uptime
+      type: SNMP_AGENT
+      snmp_oid: 1.3.6.1.2.1.1.3.0
+      key: system.uptime
+      delay: 1m
+      history: 7d
+      trends: 365d
+      units: uptime
+      preprocessing:
+      - type: MULTIPLIER
+        parameters:
+        - '0.01'
+      tags:
+      - tag: component
+        value: system
+    discovery_rules:
+    - uuid: 5d82c184de07486a894e2a475bd08df0
+      name: Network interfaces discovery
+      type: SNMP_AGENT
+      snmp_oid: discovery[{#IFDESCR},1.3.6.1.2.1.2.2.1.2,{#IFTYPE},1.3.6.1.2.1.2.2.1.3,{#IFALIAS},1.3.6.1.2.1.31.1.1.1.18]
+      key: net.if.discovery
+      delay: 1h
+      filter:
+        evaltype: AND_OR
+        conditions:
+        - macro: '{#IFTYPE}'
+          value: ^6$
+          formulaid: A
+        - macro: '{#IFDESCR}'
+          value: '{$NET.IF.IFNAME.MATCHES}'
+          formulaid: B
+        - macro: '{#IFDESCR}'
+          value: '{$NET.IF.IFNAME.NOT_MATCHES}'
+          operator: NOT_MATCHES_REGEX
+          formulaid: C
+      description: Физические Ethernet-порты (ifType=6).
+      item_prototypes:
+      - uuid: 50b2e87b4e2b48e58f9eb1c1651c0ee8
+        name: 'Port {#IFDESCR}: Operational status (up/down)'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.2.1.2.2.1.8.{#SNMPINDEX}
+        key: net.if.status[ifOperStatus.{#SNMPINDEX}]
+        delay: 1m
+        history: 7d
+        trends: 365d
+        value_type: UNSIGNED
+        valuemap:
+          name: Eltex ifOperStatus
+        description: up = connected, down = disconnected
+        tags:
+        - &id001
+          tag: component
+          value: network
+        - &id002
+          tag: interface
+          value: '{#IFDESCR}'
+        - tag: metric
+          value: status
+      - uuid: 4b56de22f5bb4435813c37d7cb57f9e8
+        name: 'Port {#IFDESCR}: Admin status'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.2.1.2.2.1.7.{#SNMPINDEX}
+        key: net.if.admin[ifAdminStatus.{#SNMPINDEX}]
+        delay: 5m
+        history: 7d
+        trends: 365d
+        value_type: UNSIGNED
+        valuemap:
+          name: Eltex ifAdminStatus
+        tags:
+        - *id001
+        - *id002
+        - tag: metric
+          value: status
+      - uuid: b0500d04e09841df83f583caf496adf5
+        name: 'Port {#IFDESCR}: Speed (bandwidth)'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.2.1.31.1.1.1.15.{#SNMPINDEX}
+        key: net.if.speed[ifHighSpeed.{#SNMPINDEX}]
+        delay: 5m
+        history: 7d
+        trends: 365d
+        value_type: UNSIGNED
+        units: bps
+        preprocessing:
+        - type: MULTIPLIER
+          parameters:
+          - '1000000'
+        description: Согласованная скорость порта (ifHighSpeed, Мбит/с -> бит/с).
+        tags:
+        - *id001
+        - *id002
+        - tag: metric
+          value: speed
+      - uuid: f7c0a160d4e74960867841afb15f92d6
+        name: 'Port {#IFDESCR}: Bits received'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.2.1.31.1.1.1.6.{#SNMPINDEX}
+        key: net.if.in[ifHCInOctets.{#SNMPINDEX}]
+        delay: 1m
+        history: 7d
+        trends: 365d
+        units: bps
+        preprocessing:
+        - type: CHANGE_PER_SECOND
+          parameters:
+          - ''
+        - type: MULTIPLIER
+          parameters:
+          - '8'
+        tags:
+        - *id001
+        - *id002
+        - tag: metric
+          value: traffic
+      - uuid: d22462fb202c4653849757b3885683bc
+        name: 'Port {#IFDESCR}: Bits sent'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.2.1.31.1.1.1.10.{#SNMPINDEX}
+        key: net.if.out[ifHCOutOctets.{#SNMPINDEX}]
+        delay: 1m
+        history: 7d
+        trends: 365d
+        units: bps
+        preprocessing:
+        - type: CHANGE_PER_SECOND
+          parameters:
+          - ''
+        - type: MULTIPLIER
+          parameters:
+          - '8'
+        tags:
+        - *id001
+        - *id002
+        - tag: metric
+          value: traffic
+      - uuid: 73622d7aa45b41a885e1228f1ac312a5
+        name: 'Port {#IFDESCR}: Inbound errors'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.2.1.2.2.1.14.{#SNMPINDEX}
+        key: net.if.in.errors[ifInErrors.{#SNMPINDEX}]
+        delay: 1m
+        history: 7d
+        trends: 365d
+        units: pps
+        preprocessing:
+        - type: CHANGE_PER_SECOND
+          parameters:
+          - ''
+        tags:
+        - *id001
+        - *id002
+        - tag: metric
+          value: errors
+      - uuid: 3f18bacb0c6744658afafea53971fd9b
+        name: 'Port {#IFDESCR}: Outbound errors'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.2.1.2.2.1.20.{#SNMPINDEX}
+        key: net.if.out.errors[ifOutErrors.{#SNMPINDEX}]
+        delay: 1m
+        history: 7d
+        trends: 365d
+        units: pps
+        preprocessing:
+        - type: CHANGE_PER_SECOND
+          parameters:
+          - ''
+        tags:
+        - *id001
+        - *id002
+        - tag: metric
+          value: errors
+      trigger_prototypes:
+      - uuid: 6c745918c0d24e80829b829c21c4fe5c
+        expression: last(/Eltex MES2408C SNMP/net.if.status[ifOperStatus.{#SNMPINDEX}])=2 and last(/Eltex MES2408C SNMP/net.if.admin[ifAdminStatus.{#SNMPINDEX}])=1
+        name: 'Port {#IFDESCR}: Link down (disconnected)'
+        priority: AVERAGE
+        description: Порт включён администратором, но линк отсутствует.
+      - uuid: 3b6837d3db474ea88093d0c136e3f2fa
+        expression: change(/Eltex MES2408C SNMP/net.if.speed[ifHighSpeed.{#SNMPINDEX}])<>0 and last(/Eltex MES2408C SNMP/net.if.status[ifOperStatus.{#SNMPINDEX}])=1
+        name: 'Port {#IFDESCR}: Speed changed'
+        priority: INFO
+    - uuid: 933e3d89db3648ec88bce3743cab3db8
+      name: SFP modules discovery
+      type: SNMP_AGENT
+      snmp_oid: discovery[{#SFPTYPE},1.3.6.1.4.1.35265.1.23.53.1.1.1.2,{#IFDESCR},1.3.6.1.2.1.2.2.1.2]
+      key: sfp.discovery
+      delay: 1h
+      filter:
+        evaltype: AND_OR
+        conditions:
+        - macro: '{#SFPTYPE}'
+          value: .+
+          formulaid: A
+      description: Вставленные SFP-модули (Eltex PHD MIB, 1.3.6.1.4.1.35265). Проверьте OID командой snmpwalk на вашей прошивке, см. README.
+      item_prototypes:
+      - uuid: d45fc06ea6694a518d94085ecc80e666
+        name: 'SFP {#IFDESCR}: Type'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.35265.1.23.53.1.1.1.2.{#SNMPINDEX}
+        key: sfp.type[{#SNMPINDEX}]
+        delay: 1h
+        history: 7d
+        trends: '0'
+        value_type: CHAR
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1d
+        tags: &id003
+        - tag: component
+          value: sfp
+        - tag: interface
+          value: '{#IFDESCR}'
+      - uuid: ac4c93f9bdaa46c9839825d23ebc8822
+        name: 'SFP {#IFDESCR}: Vendor'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.35265.1.23.53.1.1.1.3.{#SNMPINDEX}
+        key: sfp.vendor[{#SNMPINDEX}]
+        delay: 1h
+        history: 7d
+        trends: '0'
+        value_type: CHAR
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1d
+        tags: *id003
+      - uuid: aaa4cf7fc9cf4fb4825aa5221a0a7312
+        name: 'SFP {#IFDESCR}: Part number'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.35265.1.23.53.1.1.1.4.{#SNMPINDEX}
+        key: sfp.pn[{#SNMPINDEX}]
+        delay: 1h
+        history: 7d
+        trends: '0'
+        value_type: CHAR
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1d
+        tags: *id003
+      - uuid: 57e0cd76a8dc49a588980f2697f10c25
+        name: 'SFP {#IFDESCR}: Serial number'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.35265.1.23.53.1.1.1.5.{#SNMPINDEX}
+        key: sfp.sn[{#SNMPINDEX}]
+        delay: 1h
+        history: 7d
+        trends: '0'
+        value_type: CHAR
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1d
+        tags: *id003
+    - uuid: b4f22db46780490a8ef8b2091f5ba5ea
+      name: Power supply and temperature discovery
+      type: SNMP_AGENT
+      snmp_oid: discovery[{#ENVUNIT},1.3.6.1.4.1.89.53.15.1.10]
+      key: env.discovery
+      delay: 1h
+      description: Блоки питания и температура по RADLAN rlPhdUnitEnvParamTable.
+      item_prototypes:
+      - uuid: 17ccefa70c46474e88556015eec1e790
+        name: 'Unit {#SNMPINDEX}: Main power supply status'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.89.53.15.1.2.{#SNMPINDEX}
+        key: env.psu.main[{#SNMPINDEX}]
+        delay: 1m
+        history: 7d
+        trends: 365d
+        value_type: UNSIGNED
+        valuemap:
+          name: Eltex env state
+        tags:
+        - &id004
+          tag: component
+          value: environment
+        - tag: metric
+          value: power
+      - uuid: 554606a2580e439c8f2463ee624c28d5
+        name: 'Unit {#SNMPINDEX}: Redundant power supply status'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.89.53.15.1.3.{#SNMPINDEX}
+        key: env.psu.redundant[{#SNMPINDEX}]
+        delay: 1m
+        history: 7d
+        trends: 365d
+        value_type: UNSIGNED
+        valuemap:
+          name: Eltex env state
+        tags:
+        - *id004
+        - tag: metric
+          value: power
+      - uuid: 668752cfb9144f268e9db1e029eeea8b
+        name: 'Unit {#SNMPINDEX}: Temperature'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.89.53.15.1.10.{#SNMPINDEX}
+        key: env.temp[{#SNMPINDEX}]
+        delay: 1m
+        history: 7d
+        trends: 365d
+        units: °C
+        tags:
+        - *id004
+        - tag: metric
+          value: temperature
+      trigger_prototypes:
+      - uuid: 517e718c89df4fa782f46e6d2ee9e1aa
+        expression: last(/Eltex MES2408C SNMP/env.psu.main[{#SNMPINDEX}])<>1
+        name: 'Unit {#SNMPINDEX}: Main power supply is not normal'
+        priority: HIGH
+        description: 1 normal, 2 warning, 3 critical, 4 shutdown, 5 notPresent, 6 notFunctioning.
+      - uuid: e8e6b4d4b48e4e1b8f75431ea40142ae
+        expression: last(/Eltex MES2408C SNMP/env.psu.redundant[{#SNMPINDEX}])<>1 and last(/Eltex MES2408C SNMP/env.psu.redundant[{#SNMPINDEX}])<>5
+        name: 'Unit {#SNMPINDEX}: Redundant power supply failure'
+        priority: AVERAGE
+        description: Состояние 5 (notPresent) не считается аварией.
+      - uuid: d16f7e0e12b34e2c8c073f02155c249b
+        expression: min(/Eltex MES2408C SNMP/env.temp[{#SNMPINDEX}],5m)>{$TEMP_WARN}
+        name: 'Unit {#SNMPINDEX}: Temperature is above {$TEMP_WARN}°C'
+        priority: WARNING
+        recovery_mode: RECOVERY_EXPRESSION
+        recovery_expression: max(/Eltex MES2408C SNMP/env.temp[{#SNMPINDEX}],5m)<{$TEMP_WARN}-3
+      - uuid: 25c2952961c043e281b3669e3ee9c6fc
+        expression: min(/Eltex MES2408C SNMP/env.temp[{#SNMPINDEX}],5m)>{$TEMP_CRIT}
+        name: 'Unit {#SNMPINDEX}: Temperature is above {$TEMP_CRIT}°C'
+        priority: HIGH
+        recovery_mode: RECOVERY_EXPRESSION
+        recovery_expression: max(/Eltex MES2408C SNMP/env.temp[{#SNMPINDEX}],5m)<{$TEMP_CRIT}-3
+    macros:
+    - macro: '{$ICMP_LOSS_WARN}'
+      value: '20'
+      description: Порог потерь ICMP, %
+    - macro: '{$ICMP_RESPONSE_TIME_WARN}'
+      value: '0.15'
+      description: Порог времени ответа, с
+    - macro: '{$TEMP_WARN}'
+      value: '60'
+      description: Warning по температуре, °C
+    - macro: '{$TEMP_CRIT}'
+      value: '75'
+      description: High по температуре, °C
+    - macro: '{$NET.IF.IFNAME.MATCHES}'
+      value: .*
+      description: Включать порты по имени (regex)
+    - macro: '{$NET.IF.IFNAME.NOT_MATCHES}'
+      value: ^(Null|vlan|loopback|tunnel).*
+      description: Исключать порты по имени (regex)
+    valuemaps:
+    - uuid: 6a4aa746698c438682edfe0d8580ce29
+      name: Eltex ICMP ping
+      mappings:
+      - value: '0'
+        newvalue: Down
+      - value: '1'
+        newvalue: Up
+    - uuid: d86389350a80407f8fc8784676e65403
+      name: Eltex ifOperStatus
+      mappings:
+      - value: '1'
+        newvalue: up (connected)
+      - value: '2'
+        newvalue: down (disconnected)
+      - value: '3'
+        newvalue: testing
+      - value: '4'
+        newvalue: unknown
+      - value: '5'
+        newvalue: dormant
+      - value: '6'
+        newvalue: notPresent
+      - value: '7'
+        newvalue: lowerLayerDown
+    - uuid: 6a713be7ba0d41758029094d1c16222c
+      name: Eltex ifAdminStatus
+      mappings:
+      - value: '1'
+        newvalue: up
+      - value: '2'
+        newvalue: down
+      - value: '3'
+        newvalue: testing
+    - uuid: 95afd294ddb84699874de7736aa29e7b
+      name: Eltex env state
+      mappings:
+      - value: '1'
+        newvalue: normal
+      - value: '2'
+        newvalue: warning
+      - value: '3'
+        newvalue: critical
+      - value: '4'
+        newvalue: shutdown
+      - value: '5'
+        newvalue: notPresent
+      - value: '6'
+        newvalue: notFunctioning
+    tags:
+    - tag: vendor
+      value: Eltex
+    - tag: model
+      value: MES2408C
+  triggers:
+  - uuid: 5519319279fc43d785318aef3f1d94a6
+    expression: max(/Eltex MES2408C SNMP/icmpping,#3)=0
+    name: 'Eltex MES2408C: недоступен по ICMP'
+    priority: HIGH
+    description: Устройство не отвечает на ping.
+  - uuid: 3b2985d740fc4c77825a8ce685722fac
+    expression: min(/Eltex MES2408C SNMP/icmppingloss,5m)>{$ICMP_LOSS_WARN} and min(/Eltex MES2408C SNMP/icmppingloss,5m)<100
+    name: 'Eltex MES2408C: потери ICMP выше {$ICMP_LOSS_WARN}%'
+    priority: WARNING
+  - uuid: c51da83dfdbd4ee8854eaa110a447535
+    expression: avg(/Eltex MES2408C SNMP/icmppingsec,5m)>{$ICMP_RESPONSE_TIME_WARN}
+    name: 'Eltex MES2408C: время ответа ICMP выше {$ICMP_RESPONSE_TIME_WARN}'
+    priority: WARNING
+  - uuid: 2253a9ae33ca409180d53d1cf2874c24
+    expression: last(/Eltex MES2408C SNMP/system.uptime)<10m
+    name: 'Eltex MES2408C: устройство перезагружалось (uptime < 10m)'
+    priority: INFO
+    description: Uptime меньше 10 минут.
