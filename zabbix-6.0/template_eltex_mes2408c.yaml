@@ -1,0 +1,290 @@
+zabbix_export:
+  version: '6.0'
+  template_groups:
+    - uuid: 75ebe13a2d3847b5abf4ee49c74a151a
+      name: Templates/Network devices
+  templates:
+    - uuid: d97e08d2b50445b9bc8523ea880512dd
+      template: "Template Eltex MES2408C SNMP"
+      name: "Template Eltex MES2408C SNMP"
+      description: Мониторинг Eltex MES2408C по SNMP (v2c). Макрос {$SNMP_COMMUNITY}.
+      groups:
+        - name: Templates/Network devices
+      macros:
+        - macro: '{$SNMP_COMMUNITY}'
+          value: public
+        - macro: '{$TEMP.WARN}'
+          value: '60'
+        - macro: '{$TEMP.CRIT}'
+          value: '75'
+        - macro: '{$PORT.UTIL.WARN}'
+          value: '90'
+      items:
+          - uuid: 8e80ffea3e714a958544e546b5ed559a
+            name: ICMP ping
+            type: SIMPLE
+            key: icmpping
+            delay: 1m
+            history: 7d
+            valuemap:
+              name: Service state
+            tags:
+              - tag: component
+                value: network
+            triggers:
+              - uuid: 52ae9f5175ed42f7bbd3fd5cd9870187
+                name: "Eltex MES2408C: нет ответа на ping {HOST.NAME}"
+                expression: "max(/Template Eltex MES2408C SNMP/icmpping,#3)=0"
+                priority: HIGH
+          - uuid: fae965bb8f734d32a289afe19958dc16
+            name: ICMP время ответа
+            type: SIMPLE
+            key: icmppingsec
+            delay: 1m
+            history: 7d
+            units: s
+            tags:
+              - tag: component
+                value: network
+          - uuid: 2729dea9064f48e6b62606b0d8a46d05
+            name: "Блок питания основной: статус"
+            type: SNMP_AGENT
+            snmp_oid: "1.3.6.1.4.1.89.53.15.1.2.1"
+            key: "eltex.psu.main.status"
+            delay: 1m
+            history: 7d
+            description: "Статус: 1 normal, 2 warning, 3 critical, 4 shutdown, 5 notPresent, 6 notFunctioning"
+            triggers:
+              - uuid: 943f4c052f91454b8196efce14e3d720
+                name: "Блок питания основной: неисправность {HOST.NAME}"
+                expression: "last(/Template Eltex MES2408C SNMP/eltex.psu.main.status)>=3 and last(/Template Eltex MES2408C SNMP/eltex.psu.main.status)<>5"
+                priority: HIGH
+            tags:
+              - tag: component
+                value: power
+          - uuid: 35fb98194e4a4ad18197cf2681463f6f
+            name: "Блок питания резервный: статус"
+            type: SNMP_AGENT
+            snmp_oid: "1.3.6.1.4.1.89.53.15.1.3.1"
+            key: "eltex.psu.redundant.status"
+            delay: 1m
+            history: 7d
+            description: "Статус: 1 normal, 2 warning, 3 critical, 4 shutdown, 5 notPresent, 6 notFunctioning"
+            triggers:
+              - uuid: a793e9b05f8046fd93921563a0a59258
+                name: "Блок питания резервный: неисправность {HOST.NAME}"
+                expression: "last(/Template Eltex MES2408C SNMP/eltex.psu.redundant.status)>=3 and last(/Template Eltex MES2408C SNMP/eltex.psu.redundant.status)<>5"
+                priority: HIGH
+            tags:
+              - tag: component
+                value: power
+          - uuid: 8d0e25801cd34bde933cd62858968eb0
+            name: "Температура"
+            type: SNMP_AGENT
+            snmp_oid: "1.3.6.1.4.1.89.53.15.1.10.1"
+            key: "eltex.temperature"
+            delay: 1m
+            history: 7d
+            units: "°C"
+            triggers:
+              - uuid: 9e19706760ad47239e370eeb77fb15cb
+                name: "Температура выше порога {$TEMP.WARN}°C на {HOST.NAME}"
+                expression: "min(/Template Eltex MES2408C SNMP/eltex.temperature,5m)>{$TEMP.WARN}"
+                priority: WARNING
+              - uuid: ce5c4526d42241da95b4b8b510ce0e9a
+                name: "Температура критическая {$TEMP.CRIT}°C на {HOST.NAME}"
+                expression: "min(/Template Eltex MES2408C SNMP/eltex.temperature,5m)>{$TEMP.CRIT}"
+                priority: HIGH
+            tags:
+              - tag: component
+                value: temperature
+          - uuid: bc164ec33c4e4c989a781820621b5d0b
+            name: "Системное время работы (uptime)"
+            type: SNMP_AGENT
+            snmp_oid: "1.3.6.1.2.1.1.3.0"
+            key: "sys.uptime"
+            delay: 1m
+            history: 7d
+            units: "uptime"
+            tags:
+              - tag: component
+                value: system
+          - uuid: da2f07bc5c6946e88a878dccc34a3139
+            name: "Модель"
+            type: SNMP_AGENT
+            snmp_oid: "1.3.6.1.2.1.1.1.0"
+            key: "sys.descr"
+            delay: 1h
+            history: 7d
+            value_type: CHAR
+            trends: '0'
+            tags:
+              - tag: component
+                value: system
+      discovery_rules:
+        - uuid: 32b68983b6f94e53a2e727989ceda5d4
+          name: Обнаружение портов
+          type: SNMP_AGENT
+          snmp_oid: 'discovery[{#IFDESCR},1.3.6.1.2.1.2.2.1.2,{#IFALIAS},1.3.6.1.2.1.31.1.1.1.18,{#IFTYPE},1.3.6.1.2.1.2.2.1.3]'
+          key: net.if.discovery
+          delay: 1h
+          filter:
+            evaltype: AND_OR
+            conditions:
+              - macro: '{#IFTYPE}'
+                value: '^6$'
+                formulaid: A
+          item_prototypes:
+              - uuid: ddce7c87e3a84c6bad4a3f28158e4b81
+                name: "Порт {#IFDESCR}: состояние (1 up, 2 down)"
+                type: SNMP_AGENT
+                snmp_oid: "1.3.6.1.2.1.2.2.1.8.{#SNMPINDEX}"
+                key: "net.if.status[{#SNMPINDEX}]"
+                delay: 1m
+                history: 7d
+                tags:
+                  - tag: component
+                    value: interface
+                trigger_prototypes:
+                  - uuid: 9e257bdce56b4c9c8514d0544ba4a3e0
+                    name: "Порт {#IFDESCR} ({#IFALIAS}) недоступен (down) на {HOST.NAME}"
+                    expression: "last(/Template Eltex MES2408C SNMP/net.if.status[{#SNMPINDEX}])=2"
+                    priority: AVERAGE
+              - uuid: ca354ba77e75429da520de42e17f20cb
+                name: "Порт {#IFDESCR}: административное состояние"
+                type: SNMP_AGENT
+                snmp_oid: "1.3.6.1.2.1.2.2.1.7.{#SNMPINDEX}"
+                key: "net.if.admin[{#SNMPINDEX}]"
+                delay: 1m
+                history: 7d
+                tags:
+                  - tag: component
+                    value: interface
+              - uuid: cbe7e0d3ff094924b226ac931f258c2f
+                name: "Порт {#IFDESCR}: connected/disconnected (carrier)"
+                type: SNMP_AGENT
+                snmp_oid: "1.3.6.1.2.1.2.2.1.8.{#SNMPINDEX}"
+                key: "net.if.connected[{#SNMPINDEX}]"
+                delay: 1m
+                history: 7d
+                valuemap:
+                  name: IF oper status
+                tags:
+                  - tag: component
+                    value: interface
+              - uuid: 9e2548a29b6a427181d0cb677d593ddc
+                name: "Порт {#IFDESCR}: полоса пропускания (скорость)"
+                type: SNMP_AGENT
+                snmp_oid: "1.3.6.1.2.1.31.1.1.1.15.{#SNMPINDEX}"
+                key: "net.if.speed[{#SNMPINDEX}]"
+                delay: 1m
+                history: 7d
+                units: "Mbps"
+                tags:
+                  - tag: component
+                    value: interface
+              - uuid: 20ffdc8299f841749fd1371ec1450218
+                name: "Порт {#IFDESCR}: входящий трафик"
+                type: SNMP_AGENT
+                snmp_oid: "1.3.6.1.2.1.31.1.1.1.6.{#SNMPINDEX}"
+                key: "net.if.in[{#SNMPINDEX}]"
+                delay: 1m
+                history: 7d
+                units: "bps"
+                preprocessing:
+                  - type: CHANGE_PER_SECOND
+                    parameters:
+                      - ''
+                  - type: MULTIPLIER
+                    parameters:
+                      - '8'
+                tags:
+                  - tag: component
+                    value: interface
+              - uuid: e16c140a957e4ef0959b582aad2847a2
+                name: "Порт {#IFDESCR}: исходящий трафик"
+                type: SNMP_AGENT
+                snmp_oid: "1.3.6.1.2.1.31.1.1.1.10.{#SNMPINDEX}"
+                key: "net.if.out[{#SNMPINDEX}]"
+                delay: 1m
+                history: 7d
+                units: "bps"
+                preprocessing:
+                  - type: CHANGE_PER_SECOND
+                    parameters:
+                      - ''
+                  - type: MULTIPLIER
+                    parameters:
+                      - '8'
+                tags:
+                  - tag: component
+                    value: interface
+              - uuid: f523e30772e843cb874853cf11dab7f6
+                name: "Порт {#IFDESCR}: ошибки входящие"
+                type: SNMP_AGENT
+                snmp_oid: "1.3.6.1.2.1.2.2.1.14.{#SNMPINDEX}"
+                key: "net.if.in.errors[{#SNMPINDEX}]"
+                delay: 1m
+                history: 7d
+                units: "pps"
+                preprocessing:
+                  - type: CHANGE_PER_SECOND
+                    parameters:
+                      - ''
+                tags:
+                  - tag: component
+                    value: interface
+        - uuid: c211b4eec2fe4003b1ca3f2d1c45ae09
+          name: Обнаружение SFP модулей
+          type: SNMP_AGENT
+          snmp_oid: 'discovery[{#SFPDESCR},1.3.6.1.2.1.47.1.1.1.1.2,{#SFPMODEL},1.3.6.1.2.1.47.1.1.1.1.13,{#SFPSERIAL},1.3.6.1.2.1.47.1.1.1.1.11]'
+          key: eltex.sfp.discovery
+          delay: 1h
+          filter:
+            evaltype: AND_OR
+            conditions:
+              - macro: '{#SFPDESCR}'
+                value: '(?i)sfp|transceiver'
+                formulaid: A
+          item_prototypes:
+              - uuid: aab716802fa541cda7ad6f223b1d08cb
+                name: "SFP {#SFPDESCR}: модель"
+                type: SNMP_AGENT
+                snmp_oid: "1.3.6.1.2.1.47.1.1.1.1.13.{#SNMPINDEX}"
+                key: "eltex.sfp.model[{#SNMPINDEX}]"
+                delay: 1m
+                history: 7d
+                value_type: CHAR
+                trends: '0'
+                tags:
+                  - tag: component
+                    value: sfp
+              - uuid: 4df3c7dae24c4aa193b0308123343cfa
+                name: "SFP {#SFPDESCR}: серийный номер"
+                type: SNMP_AGENT
+                snmp_oid: "1.3.6.1.2.1.47.1.1.1.1.11.{#SNMPINDEX}"
+                key: "eltex.sfp.serial[{#SNMPINDEX}]"
+                delay: 1m
+                history: 7d
+                value_type: CHAR
+                trends: '0'
+                tags:
+                  - tag: component
+                    value: sfp
+      valuemaps:
+        - uuid: a79600b2db924d49bf9d38f914c0fac5
+          name: Service state
+          mappings:
+            - value: '0'
+              newvalue: Down
+            - value: '1'
+              newvalue: Up
+        - uuid: fb2852152f004c55bfc904b3f6a5221a
+          name: IF oper status
+          mappings:
+            - value: '1'
+              newvalue: connected
+            - value: '2'
+              newvalue: disconnected
+            - value: '7'
+              newvalue: lowerLayerDown
