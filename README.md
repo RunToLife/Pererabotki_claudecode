@@ -6,3 +6,14 @@
   3. Какие SFP модули вставленны
   4. Состояние блоков питания
   5. Состояние темпиратуры
+
+## Шаблоны
+
+Готовые шаблоны (YAML export) лежат в каталоге `templates/`:
+
+- `templates/zabbix-6.0/template_eltex_mes2408c_snmp.yaml` — Zabbix 6.0
+- `templates/zabbix-7.4/template_eltex_mes2408c_snmp.yaml` — Zabbix 7.4
+
+Генерируются скриптом `tools/gen_templates.py`. Покрытие: ICMP ping; порты (up/down, admin status, скорость ifHighSpeed, входящий/исходящий трафик, ошибки); SFP-модули (ENTITY-MIB); блоки питания и температура (RADLAN-HWENVIROMENT / rlPhd*).
+
+**Важно:** OID блоков питания, температуры и SFP (ветка Radlan/Eltex 1.3.6.1.4.1.89.* и ENTITY-MIB) составлены по документации MIB и не проверялись на живом MES2408C — перед использованием проверьте `snmpwalk` и при необходимости поправьте OID в генераторе. Шаблоны не импортировались в реальный Zabbix. Требуется SNMP-интерфейс на хосте.
