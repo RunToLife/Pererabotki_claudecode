@@ -1,0 +1,341 @@
+zabbix_export:
+  version: '6.0'
+  template_groups:
+    - uuid: 6b993a7abc815786b55b684a37932e6e
+      name: 'Templates/Network devices'
+  templates:
+    - uuid: 8996183ea42c5b99afd99b6aa180a723
+      template: 'Eltex MES2408C by SNMP'
+      name: 'Eltex MES2408C by SNMP'
+      description: |
+        Eltex MES2408C: ICMP ping, ports (status, speed, traffic), SFP modules, power supplies, temperature.
+        Requires SNMP (v2c/v3) on the device. Vendor OIDs are exposed as macros - verify with snmpwalk.
+      groups:
+        - name: 'Templates/Network devices'
+      macros:
+        - macro: '{$SNMP.TIMEOUT}'
+          value: 5m
+        - macro: '{$ICMP.LOSS.WARN}'
+          value: '20'
+        - macro: '{$ICMP.RESPONSE.WARN}'
+          value: '0.15'
+        - macro: '{$IF.NAME.NOT_MATCHES}'
+          value: '^(vlan|Vlan|VLAN|Null|loopback|Loopback|tunnel|Tunnel|CPU|oob).*$'
+          description: Interfaces excluded from discovery
+        - macro: '{$TEMP.WARN}'
+          value: '60'
+        - macro: '{$TEMP.CRIT}'
+          value: '75'
+        - macro: '{$OID.PSU.MAIN}'
+          value: 1.3.6.1.4.1.89.53.15.1.2.1
+          description: rlPhdUnitEnvParamMainPSStatus (1 normal,2 warning,3 critical,4 shutdown,5 notPresent,6 notFunctioning)
+        - macro: '{$OID.PSU.REDUNDANT}'
+          value: 1.3.6.1.4.1.89.53.15.1.3.1
+          description: rlPhdUnitEnvParamRedundantPSStatus
+        - macro: '{$OID.TEMP}'
+          value: 1.3.6.1.4.1.89.53.15.1.10.1
+          description: rlPhdUnitEnvParamTempSensorValue (degrees C)
+        - macro: '{$OID.SFP.TABLE}'
+          value: 1.3.6.1.4.1.35265.1.23.53.1.1.1
+          description: eltPhdTransceiverInfoTable entry; indexed by ifIndex
+        - macro: '{$OID.SFP.VENDOR}'
+          value: 1.3.6.1.4.1.35265.1.23.53.1.1.1.5
+          description: SFP vendor name column (verify)
+        - macro: '{$OID.SFP.TYPE}'
+          value: 1.3.6.1.4.1.35265.1.23.53.1.1.1.3
+          description: SFP type/compliance column (verify)
+        - macro: '{$OID.SFP.SERIAL}'
+          value: 1.3.6.1.4.1.35265.1.23.53.1.1.1.8
+          description: SFP serial number column (verify)
+      items:
+        - uuid: 354134162d8f52d1a4df8041626e0d2a
+          name: System description
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.2.1.1.1.0
+          key: system.descr
+          delay: 1h
+          trends: '0'
+          value_type: TEXT
+          tags:
+            - tag: component
+              value: general
+        - uuid: 406c1925649354fabcc221ca326e59f9
+          name: Uptime
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.2.1.1.3.0
+          key: system.uptime
+          delay: 1m
+          units: uptime
+          preprocessing:
+            - type: MULTIPLIER
+              parameters:
+                - '0.01'
+          tags:
+            - tag: component
+              value: general
+        - uuid: ba66bc905bb0567d8d0c68c5ae0384a2
+          name: ICMP ping
+          type: SIMPLE
+          key: icmpping
+          delay: 1m
+          valuemap:
+            name: 'Service state'
+          triggers:
+            - uuid: 06dd5b923ba0573fbe800130aaad232f
+              expression: 'max(/Eltex MES2408C by SNMP/icmpping,#3)=0'
+              name: 'Eltex MES2408C: Unavailable by ICMP ping'
+              priority: HIGH
+          tags:
+            - tag: component
+              value: availability
+        - uuid: b5b10194191f50419f18a9577c5ba93d
+          name: ICMP loss
+          type: SIMPLE
+          key: icmppingloss
+          delay: 1m
+          value_type: FLOAT
+          units: '%'
+          triggers:
+            - uuid: 1cae00b63ea95e0ebabf3fdd2dce2c3e
+              expression: 'min(/Eltex MES2408C by SNMP/icmppingloss,5m)>{$ICMP.LOSS.WARN} and min(/Eltex MES2408C by SNMP/icmppingloss,5m)<100'
+              name: 'Eltex MES2408C: High ICMP ping loss'
+              priority: WARNING
+          tags:
+            - tag: component
+              value: availability
+        - uuid: efa7a65061d05cbe8de57c3041cfdad7
+          name: ICMP response time
+          type: SIMPLE
+          key: icmppingsec
+          delay: 1m
+          value_type: FLOAT
+          units: s
+          triggers:
+            - uuid: 5db3b8a384ab5d5cadd225a45159bc60
+              expression: 'avg(/Eltex MES2408C by SNMP/icmppingsec,5m)>{$ICMP.RESPONSE.WARN}'
+              name: 'Eltex MES2408C: High ICMP ping response time'
+              priority: WARNING
+          tags:
+            - tag: component
+              value: availability
+        - uuid: 2368d7aead2257058b59dcb1c5155c7b
+          name: Temperature
+          type: SNMP_AGENT
+          snmp_oid: '{$OID.TEMP}'
+          key: sensor.temp.value
+          delay: 1m
+          units: C
+          triggers:
+            - uuid: 3d60771c55f055568f340145d6c7e011
+              expression: 'min(/Eltex MES2408C by SNMP/sensor.temp.value,5m)>{$TEMP.WARN}'
+              name: 'Eltex MES2408C: High temperature (over {$TEMP.WARN}C)'
+              priority: WARNING
+              dependencies:
+                - name: 'Eltex MES2408C: Critical temperature (over {$TEMP.CRIT}C)'
+                  expression: 'min(/Eltex MES2408C by SNMP/sensor.temp.value,5m)>{$TEMP.CRIT}'
+            - uuid: 7eb1fcab00365b5c897ed1d0b758cb05
+              expression: 'min(/Eltex MES2408C by SNMP/sensor.temp.value,5m)>{$TEMP.CRIT}'
+              name: 'Eltex MES2408C: Critical temperature (over {$TEMP.CRIT}C)'
+              priority: HIGH
+          tags:
+            - tag: component
+              value: environment
+        - uuid: 022c21220d9e592b9e2bdff0dd1dd961
+          name: 'Power supply: main status'
+          type: SNMP_AGENT
+          snmp_oid: '{$OID.PSU.MAIN}'
+          key: sensor.psu.main.status
+          delay: 1m
+          valuemap:
+            name: 'Eltex PSU state'
+          triggers:
+            - uuid: 4e3f0289641752d7a201eb39937d7128
+              expression: 'last(/Eltex MES2408C by SNMP/sensor.psu.main.status)>=3 and last(/Eltex MES2408C by SNMP/sensor.psu.main.status)<>5'
+              name: 'Eltex MES2408C: Main power supply is not OK'
+              priority: HIGH
+          tags:
+            - tag: component
+              value: power
+        - uuid: 3a7f57dcc9655b59a86a6af2619a30bd
+          name: 'Power supply: redundant status'
+          type: SNMP_AGENT
+          snmp_oid: '{$OID.PSU.REDUNDANT}'
+          key: sensor.psu.redundant.status
+          delay: 1m
+          valuemap:
+            name: 'Eltex PSU state'
+          triggers:
+            - uuid: d4d68fbffd325bc58428b6ee1c3f047a
+              expression: 'last(/Eltex MES2408C by SNMP/sensor.psu.redundant.status)>=3 and last(/Eltex MES2408C by SNMP/sensor.psu.redundant.status)<>5'
+              name: 'Eltex MES2408C: Redundant power supply is not OK'
+              priority: AVERAGE
+          tags:
+            - tag: component
+              value: power
+      discovery_rules:
+        - uuid: d8e86b0a1d665d8c947dbff85b1bbdc9
+          name: 'Network interfaces discovery'
+          type: SNMP_AGENT
+          snmp_oid: 'discovery[{#IFNAME},1.3.6.1.2.1.31.1.1.1.1,{#IFALIAS},1.3.6.1.2.1.31.1.1.1.18,{#IFADMIN},1.3.6.1.2.1.2.2.1.7]'
+          key: net.if.discovery
+          delay: 1h
+          filter:
+            conditions:
+              - macro: '{#IFNAME}'
+                value: '{$IF.NAME.NOT_MATCHES}'
+                operator: NOT_MATCHES_REGEX
+                formulaid: A
+          item_prototypes:
+            - uuid: 532ea9f8572c572eb4de0b4fea480cea
+              name: 'Interface {#IFNAME}({#IFALIAS}): Operational status'
+              type: SNMP_AGENT
+              snmp_oid: '1.3.6.1.2.1.2.2.1.8.{#SNMPINDEX}'
+              key: 'net.if.status[ifOperStatus.{#SNMPINDEX}]'
+              delay: 1m
+              valuemap:
+                name: 'IF-MIB::ifOperStatus'
+              tags:
+                - tag: component
+                  value: network
+                - tag: interface
+                  value: '{#IFNAME}'
+              trigger_prototypes:
+                - uuid: 4948c7654688592c8bb71a72f881495e
+                  expression: 'last(/Eltex MES2408C by SNMP/net.if.status[ifOperStatus.{#SNMPINDEX}])=2 and {#IFADMIN}=1'
+                  name: 'Interface {#IFNAME}({#IFALIAS}): Link down (disconnected)'
+                  priority: AVERAGE
+                  manual_close: 'YES'
+            - uuid: e1cf1dd9e3895d6e94f6f6580f12e4c0
+              name: 'Interface {#IFNAME}({#IFALIAS}): Speed (bandwidth)'
+              type: SNMP_AGENT
+              snmp_oid: '1.3.6.1.2.1.31.1.1.1.15.{#SNMPINDEX}'
+              key: 'net.if.speed[ifHighSpeed.{#SNMPINDEX}]'
+              delay: 5m
+              units: bps
+              preprocessing:
+                - type: MULTIPLIER
+                  parameters:
+                    - '1000000'
+              tags:
+                - tag: component
+                  value: network
+                - tag: interface
+                  value: '{#IFNAME}'
+            - uuid: 43e95db991945ad395492d091a61f42a
+              name: 'Interface {#IFNAME}({#IFALIAS}): Bits received'
+              type: SNMP_AGENT
+              snmp_oid: '1.3.6.1.2.1.31.1.1.1.6.{#SNMPINDEX}'
+              key: 'net.if.in[ifHCInOctets.{#SNMPINDEX}]'
+              delay: 1m
+              units: bps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ''
+                - type: MULTIPLIER
+                  parameters:
+                    - '8'
+              tags:
+                - tag: component
+                  value: network
+                - tag: interface
+                  value: '{#IFNAME}'
+            - uuid: 0a9ebb2a20d05e22b459a57e180bcbc3
+              name: 'Interface {#IFNAME}({#IFALIAS}): Bits sent'
+              type: SNMP_AGENT
+              snmp_oid: '1.3.6.1.2.1.31.1.1.1.10.{#SNMPINDEX}'
+              key: 'net.if.out[ifHCOutOctets.{#SNMPINDEX}]'
+              delay: 1m
+              units: bps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ''
+                - type: MULTIPLIER
+                  parameters:
+                    - '8'
+              tags:
+                - tag: component
+                  value: network
+                - tag: interface
+                  value: '{#IFNAME}'
+        - uuid: f3682de53f8f50d8bcaf0d21dc32fe94
+          name: 'SFP modules discovery'
+          type: SNMP_AGENT
+          snmp_oid: 'discovery[{#SFPVENDOR},{$OID.SFP.VENDOR}]'
+          key: sfp.discovery
+          delay: 1h
+          item_prototypes:
+            - uuid: 423569757b1957bb914e5da67a390eeb
+              name: 'SFP {#SNMPINDEX}: Vendor'
+              type: SNMP_AGENT
+              snmp_oid: '{$OID.SFP.VENDOR}.{#SNMPINDEX}'
+              key: 'sfp.vendor[{#SNMPINDEX}]'
+              delay: 1h
+              trends: '0'
+              value_type: CHAR
+              tags:
+                - tag: component
+                  value: sfp
+            - uuid: ceacaa33868052dbbfa54a25ed8fd923
+              name: 'SFP {#SNMPINDEX}: Type'
+              type: SNMP_AGENT
+              snmp_oid: '{$OID.SFP.TYPE}.{#SNMPINDEX}'
+              key: 'sfp.type[{#SNMPINDEX}]'
+              delay: 1h
+              trends: '0'
+              value_type: CHAR
+              tags:
+                - tag: component
+                  value: sfp
+            - uuid: a5fad1e513cf5942bd2ed0cfccc6aac5
+              name: 'SFP {#SNMPINDEX}: Serial number'
+              type: SNMP_AGENT
+              snmp_oid: '{$OID.SFP.SERIAL}.{#SNMPINDEX}'
+              key: 'sfp.serial[{#SNMPINDEX}]'
+              delay: 1h
+              trends: '0'
+              value_type: CHAR
+              tags:
+                - tag: component
+                  value: sfp
+      valuemaps:
+        - uuid: ad9f88d8e8eb54b6acc274c140918296
+          name: 'Service state'
+          mappings:
+            - value: '0'
+              newvalue: Down
+            - value: '1'
+              newvalue: Up
+        - uuid: f6ac9b66db5a55c193c6019b93c50e2d
+          name: 'IF-MIB::ifOperStatus'
+          mappings:
+            - value: '1'
+              newvalue: up
+            - value: '2'
+              newvalue: down
+            - value: '3'
+              newvalue: testing
+            - value: '4'
+              newvalue: unknown
+            - value: '5'
+              newvalue: dormant
+            - value: '6'
+              newvalue: notPresent
+            - value: '7'
+              newvalue: lowerLayerDown
+        - uuid: 59fba1de76d85c13a0493fc3d326aadc
+          name: 'Eltex PSU state'
+          mappings:
+            - value: '1'
+              newvalue: normal
+            - value: '2'
+              newvalue: warning
+            - value: '3'
+              newvalue: critical
+            - value: '4'
+              newvalue: shutdown
+            - value: '5'
+              newvalue: notPresent
+            - value: '6'
+              newvalue: notFunctioning
